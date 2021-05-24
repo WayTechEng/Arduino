@@ -12,8 +12,9 @@ long int sum = 0;
 int counter = 0;
 int max_val = 0;
 int arr[800] = {0};
-int num = 150;
+int num = 350;
 DS1307 clock;//define a object of DS1307 class
+
 
 void setup(){
   Serial.begin(9600);
