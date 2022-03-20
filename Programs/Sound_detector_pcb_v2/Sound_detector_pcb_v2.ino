@@ -74,10 +74,11 @@ void loop() {
 //  int level = sum / num;
 //  sum = 0;
   lcd.setCursor(10,1);
-  lcd.print("    ");
+  lcd.print("      ");
   delay(1);
   lcd.setCursor(10,1);
-  lcd.print(distance);
+  lcd.print(int(distance));
+  lcd.print(" mm");
   delay(50);
 
 }
