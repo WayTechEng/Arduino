@@ -7,12 +7,13 @@ int charging_enable = 4;
 int bat_voltage_pin = A0;
 int raw_val = 0;
 double max_voltage = 12.8;
-unsigned long start_time = millis();
+unsigned long start_time = 0;
 int loop_counter = 0;
 int num_iterations = 5;
 double voltage_sum = 0;
-int charging_interval = 20;
-unsigned long minutes_to_charge = 180L;
+int waiting_interval = 20;  // Hours * minutes * seconds  == time in seconds
+long milli_secs_to_charge = 7200000;
+int min_bat_thresh = 12;
 
 LiquidCrystal_I2C lcd(0x27, 2, 1, 0 , 4, 5, 6, 7, 3, POSITIVE);
 
@@ -25,9 +26,17 @@ void setup() {
 
   lcd.begin(16, 2);
   lcd.clear();
-  lcd.print("Hello");
+  lcd.print("Initialising");
+  lcd.setCursor(0,1);
+  lcd.print("..3");
+  delay(1000);
+  lcd.print("..2");
+  delay(1000);
+  lcd.print("..1");
   digitalWrite(charging_led, LOW);
   digitalWrite(charging_enable, LOW);
+
+  start_time = millis();
 }
 
 void loop() {
@@ -36,18 +45,32 @@ void loop() {
   double bat_voltage = max_voltage * (raw_val/1023.0);
   voltage_sum += bat_voltage;
   loop_counter++;
-
+  
+  // Serial.println(raw_val);
+  // printDouble(bat_voltage, 3);
+  // Serial.println("");
+  // lcd.clear();
+  // lcd.setCursor(0,1);
+  // lcd.print("B_VOLTS: ");
+  // lcd.print(bat_voltage);
+  
   if (loop_counter > num_iterations)
   {
-    avg_voltage = voltage_sum / loop_counter;
+    unsigned long elapsed_time = millis() - start_time;
+    //                                    seconds    minutes
+    // unsigned long minutes = elapsed_time /   1000   /   60;
+    double minutes = double(elapsed_time) /   1000.0   /   60.0    /    60.0;
+
+    double avg_voltage = voltage_sum / loop_counter;
     
-    lcd.clear();
-    lcd.setCursor(0,1);
-    lcd.print("B_VOLTS: ");
-    lcd.print(avg_voltage);
+    // lcd.clear();
+    // lcd.setCursor(0,1);
+    // lcd.print("B_VOLTS: ");
+    // lcd.print(avg_voltage);
     
     if(avg_voltage < min_bat_thresh)
     {
+      // Serial.println("Charging - Min voltage detected");
       digitalWrite(charging_enable, HIGH);
       digitalWrite(charging_led, HIGH);
       lcd.clear();
@@ -55,39 +78,51 @@ void loop() {
       lcd.setCursor(0,1);
       lcd.print("CHARGING...");
       
-      unsigned long milli_secs = minutes_to_charge * 60 * 1000;
-      delay(milli_secs);
+      delay(milli_secs_to_charge);
       digitalWrite(charging_enable, LOW);
       digitalWrite(charging_led, LOW);
     }
-
-    unsigned long elapsed_time = start_time - millis();
-    //                                    seconds    minutes   hours
-    unsigned long hours = elapsed_time /   1000   /   60    /   60
-
-    if(hours >= charging_interval)
+    else if(minutes >= waiting_interval)
     {
+      // Serial.println("Charging - periodic charging activated");
       lcd.clear();
-      lcd.print("Planned");
+      lcd.print("PLANNED");
       lcd.setCursor(0,1);
-      lcd.print("CHARGING");
-      digitalWrite(charging_enable, HIGH);
-      digitalWrite(charging_led, HIGH);
+      lcd.print("CHARGING:");
+      lcd.print(milli_secs_to_charge/1000/60);   
 
-      unsigned long milli_secs = minutes_to_charge * 60 * 1000;
-      delay(milli_secs);
+//      lcd.print(hours);
+//      lcd.setCursor(0,1);
+//      lcd.print(elapsed_time);
+      
+      digitalWrite(charging_enable, HIGH);
+      digitalWrite(charging_led, HIGH);      
+      delay(milli_secs_to_charge);
       digitalWrite(charging_enable, LOW);
       digitalWrite(charging_led, LOW);
       start_time = millis();
     }
+    else
+    {
+      lcd.clear();
+      lcd.print("WAITING");
+      lcd.setCursor(0,1);
+      lcd.print(minutes);
+      lcd.print("/");
+      lcd.print(waiting_interval);
+      lcd.print(" hrs");
+    }    
 
+    // delay(1000);
+    
     loop_counter = 0;
     voltage_sum = 0;
+    // Serial.println("Resetting loop counter\n-------------------------------------------\n");
   }
   
 
-  Serial.println(raw_val);
-//  printDouble(test, 3);
+  
+//  
 //  Serial.println(".. .. ");
 //  Serial.println("");
   delay(1000);  

@@ -1,0 +1,6 @@
+{
+    "board": "arduino:avr:uno",
+    "programmer": "arduino:avrispmkii",
+    "sketch": "Pump_Controller__Workshop.ino",
+    "port": "COM3"
+}
