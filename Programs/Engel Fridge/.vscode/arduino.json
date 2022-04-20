@@ -1,6 +1,6 @@
 {
     "board": "arduino:avr:uno",
     "programmer": "arduino:avrispmkii",
-    "sketch": "Fridge_Controller.ino",
-    "port": "COM3"
+    "port": "COM3",
+    "sketch": "V1\\V1.ino"
 }
