@@ -1,0 +1,6 @@
+{
+    "board": "arduino:avr:uno",
+    "programmer": "arduino:avrispmkii",
+    "sketch": "microswitch_finder_and_remote_debugger.ino",
+    "port": "COM3"
+}
