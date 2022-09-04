@@ -1,6 +1,7 @@
 #include <Arduino.h>
-#include <IRremote.h>
+//#include <IRremote.h>
 #include "TinyIRReceiver.hpp"
+#include <PWMFreak.h>
 
 // Pins
 int M1_extend_pin = 6;
@@ -40,13 +41,26 @@ unsigned long start_timer;
 unsigned long reversal_timer;
 int reversal_lag_duration = 2000;
 bool instant_reversal_avoided = false;
-  bool avoid_instant_reversal = false;
+bool avoid_instant_reversal = false;
 
 int M1_max_PWM = 150;
 int M2_max_PWM = 200;
 
+// PWM frequencies and timer dividers
+int pins_5_6 = 5;   // timer 0
+int pins_9_10 = 9;  // timer 1
+int pins_3_11 = 3;  // timer 2
+int timer0_div = 8;
+int timer1_div = 1;
+int timer2_div = 1;
+int time_factor = 8;
+
+
 void setup() {
-  Serial.begin(9600);
+  setPwmFrequency(pins_5_6, timer0_div);  // timer 0
+  setPwmFrequency(pins_9_10, timer1_div); // timer 1
+  setPwmFrequency(pins_3_11, timer2_div); // timer 2
+  Serial.begin(115200);
   Serial.println("Initialising..\n");
 
   // Outputs
@@ -95,8 +109,8 @@ void loop() {
 
     if(avoid_instant_reversal)
     {
-      Serial.println(millis() - reversal_timer);
-      if((millis() - reversal_timer) > reversal_lag_duration)
+      Serial.println((millis() - reversal_timer)/time_factor);
+      if((millis() - reversal_timer)/time_factor > reversal_lag_duration)
       {
         Serial.println("Reversal time-delay reached");
         avoid_instant_reversal = false;
@@ -160,7 +174,8 @@ void loop() {
 
   if(retracting && !extending && !door_open)
   {
-    unsigned long time_elapsed = millis() - start_timer;
+    unsigned long time_elapsed = (millis() - start_timer)/time_factor;
+    // Serial.println(time_elapsed);
     int m1_retracted = digitalRead(sw_top_retract);
     int m2_retracted = digitalRead(sw_bot_retract);
     if(m1_retracted)
@@ -174,6 +189,7 @@ void loop() {
       {
         M1_retract_PWM = M1_max_PWM;
       }
+//      Serial.println(M1_retract_PWM);
     }
     if(m2_retracted)
     {
@@ -199,7 +215,8 @@ void loop() {
   }
   else if(!retracting && extending && !door_open)
   {
-    unsigned long time_elapsed = millis() - start_timer;
+    unsigned long time_elapsed = (millis() - start_timer)/time_factor;
+    // Serial.println(time_elapsed);
     int m1_extended = digitalRead(sw_top_extend);
     int m2_extended = digitalRead(sw_bot_extend);
     if(m1_extended)

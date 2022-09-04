@@ -110,7 +110,7 @@ void loop() {
   int door = digitalRead(sw_door);
   if(!top_extend)
   {
-    Serial.println("Top extend");
+    Serial.println("top extend");
   }
   if(!bot_extend)
   {
@@ -124,7 +124,7 @@ void loop() {
   {
     Serial.println("bot_retract");
   }
-  if(door)
+  if(!door)
   {
     Serial.println("door");
   }
@@ -144,27 +144,4 @@ void handleReceivedTinyIRData(uint16_t aAddress, uint8_t aCommand, bool isRepeat
   sCallbackData.Command = aCommand;
   sCallbackData.isRepeat = isRepeat;
   sCallbackData.justWritten = true;
-
-// #if defined(ARDUINO_ARCH_MBED) || defined(ESP32)
-//     // Copy data for main loop, this is the recommended way for handling a callback :-)
-//     sCallbackData.Address = aAddress;
-//     sCallbackData.Command = aCommand;
-//     sCallbackData.isRepeat = isRepeat;
-//     sCallbackData.justWritten = true;
-// #else
-//     /*
-//      * This is not allowed in ISR context for any kind of RTOS
-//      * For Mbed we get a kernel panic and "Error Message: Semaphore: 0x0, Not allowed in ISR context" for Serial.print()
-//      * for ESP32 we get a "Guru Meditation Error: Core  1 panic'ed" (we also have an RTOS running!)
-//      */
-//     // Print only very short output, since we are in an interrupt context and do not want to miss the next interrupts of the repeats coming soon
-//     Serial.print(F("A=0x"));
-//     Serial.print(aAddress, HEX);
-//     Serial.print(F(" C=0x"));
-//     Serial.print(aCommand, HEX);
-//     Serial.print(F(" R="));
-//     Serial.print(isRepeat);
-//     Serial.println();
-//     Serial.println("boo");
-// #endif
 }

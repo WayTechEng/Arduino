@@ -143,10 +143,10 @@ void IRPinChangeInterruptHandler(void)
      */
     uint32_t tCurrentMicros = micros();
 #if defined(DISABLE_NEC_SPECIAL_REPEAT_SUPPORT)
-    uint16_t tMicrosOfMarkOrSpace = tCurrentMicros - TinyIRReceiverControl.LastChangeMicros;
+    uint32_t tMicrosOfMarkOrSpace = tCurrentMicros - TinyIRReceiverControl.LastChangeMicros;
 #else
     uint32_t tMicrosOfMarkOrSpace32 = tCurrentMicros - TinyIRReceiverControl.LastChangeMicros;
-    uint16_t tMicrosOfMarkOrSpace = tMicrosOfMarkOrSpace32;
+    uint32_t tMicrosOfMarkOrSpace = tMicrosOfMarkOrSpace32;
 #endif
     TinyIRReceiverControl.LastChangeMicros = tCurrentMicros;
 

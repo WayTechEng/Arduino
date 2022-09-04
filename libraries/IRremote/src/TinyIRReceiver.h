@@ -48,7 +48,7 @@ void handleReceivedTinyIRData(uint16_t aAddress, uint8_t aCommand, bool isRepeat
 #define NEC_COMMAND_BITS        16 // Command and inverted command
 
 #define NEC_BITS                (NEC_ADDRESS_BITS + NEC_COMMAND_BITS)
-#define NEC_UNIT                560
+#define NEC_UNIT                4480l    //560
 
 #define NEC_HEADER_MARK         (16 * NEC_UNIT) // 9000
 #define NEC_HEADER_SPACE        (8 * NEC_UNIT)  // 4500
