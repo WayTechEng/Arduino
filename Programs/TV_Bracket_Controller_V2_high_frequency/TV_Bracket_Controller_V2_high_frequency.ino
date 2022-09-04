@@ -36,15 +36,18 @@ volatile struct TinyIRReceiverCallbackDataStruct sCallbackData;
 bool retracting = false;
 bool extending = false;
 
-float time_till_full_speed = 4000;
+float time_till_full_speed_M1_extract = 6000;
+float time_till_full_speed_M1_retract = 4000;
+float time_till_full_speed_M2_extract = 4000;
+float time_till_full_speed_M2_retract = 4000;
 unsigned long start_timer;
 unsigned long reversal_timer;
 int reversal_lag_duration = 2000;
 bool instant_reversal_avoided = false;
 bool avoid_instant_reversal = false;
 
-int M1_max_PWM = 150;
-int M2_max_PWM = 200;
+int M1_max_PWM = 170;
+int M2_max_PWM = 215;
 
 // PWM frequencies and timer dividers
 int pins_5_6 = 5;   // timer 0
@@ -184,7 +187,7 @@ void loop() {
     }
     else
     {
-      M1_retract_PWM = M1_max_PWM * float(time_elapsed)/time_till_full_speed;
+      M1_retract_PWM = M1_max_PWM * float(time_elapsed)/time_till_full_speed_M1_retract;
       if(M1_retract_PWM > M1_max_PWM)
       {
         M1_retract_PWM = M1_max_PWM;
@@ -197,7 +200,7 @@ void loop() {
     }
     else
     {
-      M2_retract_PWM = M2_max_PWM * float(time_elapsed)/time_till_full_speed;
+      M2_retract_PWM = M2_max_PWM * float(time_elapsed)/time_till_full_speed_M2_retract;
       if(M2_retract_PWM > M2_max_PWM)
       {
         M2_retract_PWM = M2_max_PWM;
@@ -225,7 +228,7 @@ void loop() {
     }
     else
     {
-      M1_extend_PWM = M1_max_PWM * float(time_elapsed)/time_till_full_speed;
+      M1_extend_PWM = M1_max_PWM * float(time_elapsed)/time_till_full_speed_M1_extract;
       if(M1_extend_PWM > M1_max_PWM)
       {
         M1_extend_PWM = M1_max_PWM;
@@ -237,7 +240,7 @@ void loop() {
     }
     else
     {
-      M2_extend_PWM = M2_max_PWM * float(time_elapsed)/time_till_full_speed;
+      M2_extend_PWM = M2_max_PWM * float(time_elapsed)/time_till_full_speed_M2_extract;
       if(M2_extend_PWM > M2_max_PWM)
       {
         M2_extend_PWM = M2_max_PWM;
