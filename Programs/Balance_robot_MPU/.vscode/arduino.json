@@ -1,0 +1,6 @@
+{
+    "board": "arduino:avr:uno",
+    "programmer": "avrispmkii",
+    "sketch": "Balance_robot_MPU.ino",
+    "port": "COM3"
+}

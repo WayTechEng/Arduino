@@ -1,6 +1,6 @@
-const int mot1 = 2; // "Positive"
-const int mot2 = 3; // "Negative"
-const int en1 = 9; // Feed PWM signal to this pin
+const int mot1 = 7; // "Positive"
+const int mot2 = 8; // "Negative"
+const int en1 = 6; // Feed PWM signal to this pin
 int PWM_val = 255*0.8; // 80% PWM
 
 
