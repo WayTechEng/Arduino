@@ -1,0 +1,5 @@
+{
+    "sketch": "Test_vs_1.ino",
+    "board": "arduino:avr:uno",
+    "programmer": "avrispmkii"
+}

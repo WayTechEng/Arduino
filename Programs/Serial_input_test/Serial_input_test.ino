@@ -20,9 +20,9 @@ void loop() {
   }
 
   counts++;
-  if(counts > 500000)
+  if(counts > 50000)
   {
-    double st = 1000*(millis() - t_start)/500000;
+    double st = 1000*(millis() - t_start)/50000;
     Serial.print("Time: ");
     Serial.println(st);
     t_start = millis();

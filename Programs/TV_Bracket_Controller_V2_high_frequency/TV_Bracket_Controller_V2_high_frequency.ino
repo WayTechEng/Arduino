@@ -60,6 +60,7 @@ int time_factor = 8;
 
 
 void setup() {
+  // https://nerdytechy.com/how-to-change-the-pwm-frequency-of-arduino/
   setPwmFrequency(pins_5_6, timer0_div);  // timer 0
   setPwmFrequency(pins_9_10, timer1_div); // timer 1
   setPwmFrequency(pins_3_11, timer2_div); // timer 2

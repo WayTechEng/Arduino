@@ -1,0 +1,6 @@
+{
+    "board": "arduino:avr:uno",
+    "programmer": "avrispmkii",
+    "port": "COM3",
+    "sketch": "IR_controller_Base.ino"
+}

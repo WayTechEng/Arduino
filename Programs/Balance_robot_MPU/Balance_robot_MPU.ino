@@ -1,8 +1,9 @@
 // I2Cdev and MPU6050 must be installed as libraries, or else the .cpp/.h files
 // for both classes must be in the include path of your project
 #include "I2Cdev.h"
-
+#include <PWMFreak.h>
 #include "MPU6050_6Axis_MotionApps20.h"
+#include "PinChangeInterrupt.h"
 //#include "MPU6050.h" // not necessary if using MotionApps include file
 
 #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
@@ -19,6 +20,11 @@ MPU6050 mpu;
 #define INTERRUPT_PIN 2  // use pin 2 on Arduino Uno & most boards
 #define LED_PIN 13 // (Arduino is 13, Teensy is 11, Teensy++ is 6)
 bool blinkState = false;
+
+// https://nerdytechy.com/how-to-change-the-pwm-frequency-of-arduino/
+// https://www.etechnophiles.com/change-frequency-pwm-pins-arduino-uno/
+int pins_9_10 = 9;  // timer 1
+int timer1_div = 1;
 
 // MPU control/status vars
 bool dmpReady = false;  // set true if DMP init was successful
@@ -39,13 +45,13 @@ float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gra
 
 float Kp = 60;
 float Ki = 0;
-float Kd = 0;
+float Kd = 0.00; // 0.07
 float setpoint = 0.3;
 double I_err = 0;
 float prev_err = 0;
 
-int off_thresh_L = -20;
-int off_thresh_R = 20;
+int off_thresh_L = -10;
+int off_thresh_R = 10;
 float angles[10] = {0,0,0,0,0,0,0,0,0,0};
 int arr_size = 10;
 int max_pwm = 255;
@@ -54,7 +60,9 @@ int en1 = 2;
 int en2 = 4;
 int out1 = 5;
 int out2 = 6;
-double dither_val = 350;
+double dither_ratio = 350;
+double dither_bounce = 1;
+double dither_const = 0.05;
 
 float dt_theory = 6;
 float dt_actual = 6;
@@ -64,9 +72,24 @@ int n_counts = 20;
 unsigned long t_s = millis();
 unsigned long t_start = millis();
 
+const int encoder_a = 7; // Pin 3
+const int encoder_b = 8; // Pin 5
+long encoder_pulse_counter = 0;
+long direction = 1;
+
 volatile bool mpuInterrupt = false;     // indicates whether MPU interrupt pin has gone high
 void dmpDataReady() {
     mpuInterrupt = true;
+}
+void encoderPinChangeA()
+{
+    encoder_pulse_counter += 1;
+    direction = digitalRead(encoder_a) == digitalRead(encoder_b) ? -1 : 1;
+}
+void encoderPinChangeB()
+{
+    encoder_pulse_counter += 1;
+    direction = digitalRead(encoder_a) != digitalRead(encoder_b) ? -1 : 1;
 }
 
 void setup() {
@@ -146,8 +169,16 @@ void setup() {
     digitalWrite(en1, 1);
     digitalWrite(en2, 1);
 
+    setPwmFrequency(pins_9_10, timer1_div); // timer 1
+
+    pinMode(encoder_a, INPUT_PULLUP);
+    pinMode(encoder_b, INPUT_PULLUP);
+    attachPCINT(digitalPinToPCINT(encoder_a), encoderPinChangeA, CHANGE);
+    attachPCINT(digitalPinToPCINT(encoder_b), encoderPinChangeB, CHANGE);
+
     t_s = millis();
     t_start = millis();
+    
 }
 
 
@@ -201,17 +232,18 @@ void loop()
         }
         analogWrite(out1, pwm_int);
         analogWrite(out2, 0);
-        accum -= pwm_int/dither_val;
+        accum -= pwm_int/dither_ratio;
+        // accum -= dither_const;
         // Serial.println(accum);
         // Serial.println();
         // accum = (constrain(accum, -1.0, 1.0));
-        if(accum > 1)
+        if(accum > dither_bounce)
         {
-          accum = 1;
+          accum = dither_bounce;
         }
-        else if(accum < -1)
+        else if(accum < -dither_bounce)
         {
-          accum = -1;
+          accum = -dither_bounce;
         }
       }
       else if(pwm < 0)
@@ -226,17 +258,18 @@ void loop()
         }
         analogWrite(out1, 0);
         analogWrite(out2, pwm_int);
-        accum += pwm_int/dither_val;
+        accum += pwm_int/dither_ratio;
+        // accum += dither_const;
         // Serial.println(accum);
         // Serial.println();
         // accum = (constrain(accum, -1.0, 1.0));
-        if(accum > 1)
+        if(accum > dither_bounce)
         {
-          accum = 1;
+          accum = dither_bounce;
         }
-        else if(accum < -1)
+        else if(accum < -dither_bounce)
         {
-          accum = -1;
+          accum = -dither_bounce;
         }
       }      
     }
@@ -265,6 +298,7 @@ void loop()
       // Serial.println(angle);
       // Serial.println(accum);
       // Serial.println();
+      // Serial.println(encoder_pulse_counter);
       counter = 0;
       t_s = millis();
     }
@@ -273,7 +307,7 @@ void loop()
     if(Serial.available() > 0)
     {
       int s_input = Serial.read();
-      Serial.println(s_input);
+      // Serial.println(s_input);
       switch(s_input)
       {
         case 49: // 1
@@ -305,6 +339,16 @@ void loop()
           Kd += .01;
           Serial.print("Kd: ");
           Serial.println(Kd);
+          break;
+        case 43: // "+"
+          setpoint += .1;
+          Serial.print("Setpoint: ");
+          Serial.println(setpoint);
+          break;
+        case 45: // "-"
+          setpoint -= .1;
+          Serial.print("Setpoint: ");
+          Serial.println(setpoint);
           break;
       }
 
