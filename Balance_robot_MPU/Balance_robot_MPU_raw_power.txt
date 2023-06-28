@@ -21,6 +21,12 @@ MPU6050 mpu;
 #define LED_PIN 13 // (Arduino is 13, Teensy is 11, Teensy++ is 6)
 bool blinkState = false;
 
+// Pin declarations
+int en = 4;
+int out1 = 5;
+int out2 = 6;
+const int encoder_a = 7; // Pin 3
+const int encoder_b = 8; // Pin 5
 // https://nerdytechy.com/how-to-change-the-pwm-frequency-of-arduino/
 // https://www.etechnophiles.com/change-frequency-pwm-pins-arduino-uno/
 int pins_9_10 = 9;  // timer 1
@@ -43,41 +49,40 @@ VectorFloat gravity;    // [x, y, z]            gravity vector
 float euler[3];         // [psi, theta, phi]    Euler angle container
 float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
 
-float Kp = 60;
-float Ki = 0;
-float Kd = 0.00; // 0.07
-float setpoint = 0.3;
-double I_err = 0;
-float prev_err = 0;
+float Kp = 1.0;
+float Ki = 0.0;
+float Kd = 0.00;
+float Kp_rpm = 0.73;
+float Ki_rpm = 0.1;
+float Kd_rpm = 0.0;
+float angle_sp = 0.3;
+int rpm_sp = 0;
+int I_err_angle = 0;
+int prev_err_angle = 0;
+int I_err_rpm = 0;
+int prev_err_rpm = 0;
+int max_pwm = 255;
 
 int off_thresh_L = -10;
 int off_thresh_R = 10;
-float angles[10] = {0,0,0,0,0,0,0,0,0,0};
-int arr_size = 10;
-int max_pwm = 255;
-
-int en1 = 2;
-int en2 = 4;
-int out1 = 5;
-int out2 = 6;
+int dither_bounce = 1;
 double dither_ratio = 350;
-double dither_bounce = 1;
 double dither_const = 0.05;
-
-float dt_theory = 6;
-float dt_actual = 6;
 float accum = 0;
 int counter = 0;
 int n_counts = 20;
-unsigned long t_s = millis();
-unsigned long t_start = millis();
-
-const int encoder_a = 7; // Pin 3
-const int encoder_b = 8; // Pin 5
 long encoder_pulse_counter = 0;
 long direction = 1;
-
+int pulses_arr[3] = {0,0,0};
 volatile bool mpuInterrupt = false;     // indicates whether MPU interrupt pin has gone high
+
+unsigned long dt_theory_us = 20000; // 10000us = 10ms
+unsigned long dt_theory_ms = dt_theory_us/1000;
+unsigned long dt_actual_us = 20000;
+unsigned long dt_actual_ms = dt_actual_us/1000;
+unsigned long t_start_actual = micros();
+unsigned long t_start_loop = micros();
+
 void dmpDataReady() {
     mpuInterrupt = true;
 }
@@ -161,38 +166,50 @@ void setup() {
 
     pinMode(out1, OUTPUT);
     pinMode(out2, OUTPUT);
-    pinMode(en1, OUTPUT);
-    pinMode(en2, OUTPUT);
+    pinMode(en, OUTPUT);
 
     analogWrite(out1, 0);
     analogWrite(out2, 0);
-    digitalWrite(en1, 1);
-    digitalWrite(en2, 1);
+    digitalWrite(en, 1);
 
     setPwmFrequency(pins_9_10, timer1_div); // timer 1
 
     pinMode(encoder_a, INPUT_PULLUP);
     pinMode(encoder_b, INPUT_PULLUP);
     attachPCINT(digitalPinToPCINT(encoder_a), encoderPinChangeA, CHANGE);
-    attachPCINT(digitalPinToPCINT(encoder_b), encoderPinChangeB, CHANGE);
-
-    t_s = millis();
-    t_start = millis();
-    
+    attachPCINT(digitalPinToPCINT(encoder_b), encoderPinChangeB, CHANGE);    
 }
 
 
 void loop()
 {  
-  if( ((millis() - t_start) >= dt_theory) && (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)))
+  int pwm = 0;
+  if( ((micros() - t_start_loop) >= dt_theory_us) && (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)))
   {
+    t_start_loop = micros();
+    int pwm_int = 0;
+    int encoder_pulse_counter_sum = 0;
+    int pwm_int = 0;
+    unsigned long rpm = 0;
+    unsigned long rpm_avg = 0;
+    int rpm_error = 0;
     mpu.dmpGetQuaternion(&q, fifoBuffer);
     mpu.dmpGetGravity(&gravity, &q);
-    mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-    t_start = millis();
-    counter++;
+    mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);    
     double angle = ypr[1]*180/M_PI-.8; 
-    int pwm_int = 0;
+
+    for(int i=2;i>0;i--) // add values to rolling pulses-moving-average
+    {
+      pulses_arr[i] = pulses_arr[i-1];
+      encoder_pulse_counter_sum += pulses_arr[i-1];
+    }
+    pulses_arr[0] = encoder_pulse_counter;
+    encoder_pulse_counter_sum += encoder_pulse_counter;    
+
+    // rpm = 60000*encoder_pulse_counter/(dt_actual_us); // <---- (60000*encoder_pulse_counter/(dt_theory_ms)) /1008;
+    rpm_avg = 60000/3*encoder_pulse_counter_sum/(dt_actual_us);
+
+    encoder_pulse_counter = 0;  
 
     ////// Print angles
     // Serial.print("ypr\t");
@@ -280,9 +297,9 @@ void loop()
     }
     
     // Time keeping
-    if(counter == n_counts)
+    if(counter == (n_counts-1))
     {
-      float t_t = millis() - t_s;
+      float t_t = micros() - t_s;
       float freq = n_counts / t_t;
       dt_actual = t_t / n_counts;
       // Serial.print("Time to complete 1000 cycles: ");
@@ -300,7 +317,7 @@ void loop()
       // Serial.println();
       // Serial.println(encoder_pulse_counter);
       counter = 0;
-      t_s = millis();
+      t_s = micros();
     }
 
     /// Keyboard inputs
@@ -360,7 +377,7 @@ void loop()
     // Serial.print("    Angle: ");
     // Serial.println(angle*100);
     // Serial.println(accum);
-
+    counter++;
   }
   
 }

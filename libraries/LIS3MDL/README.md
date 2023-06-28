@@ -1,7 +1,5 @@
 # LIS3MDL library for Arduino
 
-Version: 1.0.0<br>
-Release date: 2016 January 19<br>
 [www.pololu.com](https://www.pololu.com/)
 
 ## Summary
@@ -76,8 +74,6 @@ Several example sketches are available that show how to use the library. You can
 * `bool init(deviceType device, sa0State sa0)`<br>
   Initializes the library with the device being used (`device_LIS3MDL` or `device_auto`) and the state of the SA1 pin (`sa1_low`, `sa1_high`, or `sa1_auto`), which determines the second-least significant bit of the I&sup2;C slave address. Constants for these arguments are defined in LIS3MDL.h. Both of these arguments are optional; if they are not specified, the library will try to automatically detect the device address. A boolean is returned indicating whether the type of device was successfully determined (if necessary).
 
-  *Note:* Automatic detection of the device type currently does not work with the Arduino Due because of issues with its Wire library. To work around this, specify the device and SA1 state manually (e.g. `init(LIS3MDL::device_LIS3MDL, LIS3MDL::sa1_high)`).
-
 * `void getDeviceType(void)`<br>
   Returns the device type specified to or detected by `init()`.
 
@@ -109,4 +105,5 @@ Several example sketches are available that show how to use the library. You can
 
 ## Version history
 
-* 1.0.0 (2016 Jan 19): Original release.
+* 2.0.0 (2023-06-13): Removed timeout functionality that did not work as intended. Changed `enableDefault()` to enable BDU. Added HeadingWithLSM6 example.
+* 1.0.0 (2016-01-19): Original release.

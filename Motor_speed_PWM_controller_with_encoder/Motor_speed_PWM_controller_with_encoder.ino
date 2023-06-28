@@ -83,7 +83,6 @@ void loop()
   {    
     t_start_loop = micros();
     int encoder_pulse_counter_sum = 0;
-    int pwm_int = 0;
     unsigned long rpm = 0;
     unsigned long rpm_avg = 0;
     int rpm_error = 0;
@@ -127,7 +126,7 @@ void loop()
       prev_err_rpm = rpm_error;
       // Serial.println(pwm);
       
-      if (pwm >= 0)
+      if (pwm > 0)
       {
         if(pwm >= max_pwm)
         {

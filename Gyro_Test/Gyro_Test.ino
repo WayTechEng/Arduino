@@ -37,6 +37,6 @@ void loop() {
   Serial.print("90\xc2\xb0\n");
 
   
-  delay(10);
+  delay(500);
   
 }

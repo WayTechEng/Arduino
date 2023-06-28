@@ -18,30 +18,9 @@
 LIS3MDL::LIS3MDL(void)
 {
   _device = device_auto;
-
-  io_timeout = 0;  // 0 = no timeout
-  did_timeout = false;
 }
 
 // Public Methods //////////////////////////////////////////////////////////////
-
-// Did a timeout occur in read() since the last call to timeoutOccurred()?
-bool LIS3MDL::timeoutOccurred()
-{
-  bool tmp = did_timeout;
-  did_timeout = false;
-  return tmp;
-}
-
-void LIS3MDL::setTimeout(uint16_t timeout)
-{
-  io_timeout = timeout;
-}
-
-uint16_t LIS3MDL::getTimeout()
-{
-  return io_timeout;
-}
 
 bool LIS3MDL::init(deviceType device, sa1State sa1)
 {
@@ -112,6 +91,10 @@ void LIS3MDL::enableDefault(void)
     // 0x0C = 0b00001100
     // OMZ = 11 (ultra-high-performance mode for Z)
     writeReg(CTRL_REG4, 0x0C);
+
+    // 0x40 = 0b01000000
+    // BDU = 1 (block data update)
+    writeReg(CTRL_REG5, 0x40);
   }
 }
 
@@ -132,9 +115,9 @@ uint8_t LIS3MDL::readReg(uint8_t reg)
   Wire.beginTransmission(address);
   Wire.write(reg);
   last_status = Wire.endTransmission();
+
   Wire.requestFrom(address, (uint8_t)1);
   value = Wire.read();
-  Wire.endTransmission();
 
   return value;
 }
@@ -146,18 +129,8 @@ void LIS3MDL::read()
   // assert MSB to enable subaddress updating
   Wire.write(OUT_X_L | 0x80);
   Wire.endTransmission();
+
   Wire.requestFrom(address, (uint8_t)6);
-
-  uint16_t millis_start = millis();
-  while (Wire.available() < 6)
-  {
-    if (io_timeout > 0 && ((uint16_t)millis() - millis_start) > io_timeout)
-    {
-      did_timeout = true;
-      return;
-    }
-  }
-
   uint8_t xlm = Wire.read();
   uint8_t xhm = Wire.read();
   uint8_t ylm = Wire.read();
