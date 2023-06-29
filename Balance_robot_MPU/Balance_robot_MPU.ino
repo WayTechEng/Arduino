@@ -96,6 +96,8 @@ int desired_direction = 1;
 int cur_direction = 1;
 int pulses_arr[3] = {0,0,0};
 volatile bool mpuInterrupt = false;     // indicates whether MPU interrupt pin has gone high
+bool fifo_avaiable = false;
+bool check_for_fifo = true;
 
 long dt_theory_us = 10000; // 10000us = 10ms
 long dt_theory_ms = dt_theory_us/1000;
@@ -205,9 +207,21 @@ void setup() {
 void loop()
 {  
   int pwm = 0;
-  if( ((micros() - t_start_loop) >= dt_theory_us) && (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)))
+  if(check_for_fifo)
+  {
+    if(mpu.dmpGetCurrentFIFOPacket(fifoBuffer))
+    {
+      fifo_avaiable = true;
+      check_for_fifo = false;
+    }
+  }
+
+  // if( ((micros() - t_start_loop) >= dt_theory_us) && (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)))
+  if(fifo_avaiable && ((micros() - t_start_loop) >= dt_theory_us))
   // if(false)
   {
+    fifo_avaiable = false;
+    check_for_fifo = true;
     t_start_loop = micros();
     int encoder_pulse_counter_sum = 0;
     // int rpm = 0;
@@ -431,8 +445,8 @@ void loop()
       // Serial.print(rpm_sp);
       // Serial.print(",PWM:");
       // Serial.print(pwm);
-      // Serial.print(",ANGLE:");
-      // Serial.print(cur_angle);
+      Serial.print(",ANGLE:");
+      Serial.print(cur_angle);
       // Serial.print(",Angle_Setpoint:");
       // Serial.print(angle_sp);
       // Serial.println();

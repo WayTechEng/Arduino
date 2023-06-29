@@ -203,97 +203,6 @@ void setup() {
     attachPCINT(digitalPinToPCINT(encoder_b), encoderPinChangeB, CHANGE);
 }
 
-
-// void loop()
-// {  
-//   int pwm = 0;
-
-//   bool result = (micros() - t_start_loop) >= dt_theory_us;
-//   int fifo_avaiable = mpu.dmpGetCurrentFIFOPacket(fifoBuffer);
-//   // if( ((micros() - t_start_loop) >= dt_theory_us) && (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)))
-//   // if( result && (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)))
-//   if( result && fifo_avaiable)
-//   // if( (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)))
-//   // if(false)
-//   {
-//     Serial.println("\n--------------------------");
-//     // Serial.print("\nMicros now: ");
-//     // Serial.print(micros());
-//     // Serial.print("\nT Start: ");
-//     // Serial.print(t_start_loop);
-//     Serial.print("\nCalc: ");
-//     Serial.print(micros());
-//     Serial.print(" - ");
-//     Serial.print(t_start_loop);
-//     Serial.print("\nAnswer: ");
-//     Serial.print(micros() - t_start_loop);
-
-//     t_start_loop = micros();   
-//     // Time keeping
-//     if(counter == (n_counts-1))
-//     {
-//       dt_actual_us = (micros() - t_start_actual) / n_counts;
-//       dt_actual_ms = dt_actual_us/1000;
-//       Serial.print("\n===============================Time to complete 1 cycle: ");
-//       Serial.print(dt_actual_us);
-//       counter = 0;
-//       t_start_actual = micros();
-//     }
-//     counter++;
-//   }  
-// }
-
-// void loop()
-// {  
-//   int pwm = 0;
-
-//   bool result = (micros() - t_start_loop) >= dt_theory_us;
-//   if(check_for_fifo)
-//   {
-//     if(mpu.dmpGetCurrentFIFOPacket(fifoBuffer))
-//     {
-//       fifo_avaiable = true;
-//       check_for_fifo = false;
-//     }
-//   }
-//   // if( ((micros() - t_start_loop) >= dt_theory_us) && (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)))
-//   // if( result && (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)))
-//   if(result)
-//   {
-//     if(fifo_avaiable)
-//     // if( (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)))
-//     // if(false)
-//     {
-//       fifo_avaiable = false;
-//       check_for_fifo = true;
-//       Serial.println("\n--------------------------");
-//       // Serial.print("\nMicros now: ");
-//       // Serial.print(micros());
-//       // Serial.print("\nT Start: ");
-//       // Serial.print(t_start_loop);
-//       Serial.print("\nCalc: ");
-//       Serial.print(micros());
-//       Serial.print(" - ");
-//       Serial.print(t_start_loop);
-//       Serial.print("\nAnswer: ");
-//       Serial.print(micros() - t_start_loop);
-
-//       t_start_loop = micros();   
-//       // Time keeping
-//       if(counter == (n_counts-1))
-//       {
-//         dt_actual_us = (micros() - t_start_actual) / n_counts;
-//         dt_actual_ms = dt_actual_us/1000;
-//         Serial.print("\n===============================Time to complete 1 cycle: ");
-//         Serial.print(dt_actual_us);
-//         counter = 0;
-//         t_start_actual = micros();
-//       }
-//       counter++;
-//     }  
-//   }
-// }
-
 void loop()
 {  
   int pwm = 0;
@@ -330,6 +239,36 @@ void loop()
     // Serial.print(micros() - t_start_loop);
 
     t_start_loop = micros();   
+    ///////////////////////////////////////////////////////////
+    // Code adding tests
+    int encoder_pulse_counter_sum = 0;
+    // int rpm = 0;
+    int rpm_avg = 0;
+    int rpm_error = 0;
+    mpu.dmpGetQuaternion(&q, fifoBuffer);
+    mpu.dmpGetGravity(&gravity, &q);
+    mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);    
+    double cur_angle = ypr[1]*180/M_PI-.8; 
+
+    for(int i=2;i>0;i--) // add values to rolling pulses-moving-average
+    {
+      pulses_arr[i] = pulses_arr[i-1];
+      encoder_pulse_counter_sum += pulses_arr[i-1];
+    }
+    pulses_arr[0] = encoder_pulse_counter;
+    encoder_pulse_counter_sum += encoder_pulse_counter;    
+
+    
+    // rpm = 60000*encoder_pulse_counter/(dt_actual_us); // <---- (60000*encoder_pulse_counter/(dt_theory_ms)) /1008;
+    rpm_avg = ((cur_direction*20000)*encoder_pulse_counter_sum)/dt_actual_us;  // <---- cur_direction*60000/3*encoder_pulse_counter_sum/(dt_actual_us);
+    encoder_pulse_counter = 0;
+
+    Serial.println("Current angle: ");
+    Serial.println(cur_angle);
+
+
+
+    //////////////////////////////////////////////////////////
     // Time keeping
     counter++;
     if(counter == (n_counts))
