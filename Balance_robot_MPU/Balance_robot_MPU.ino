@@ -13,16 +13,49 @@
 
 /*
     wheel_rev/min = (pls/min) / ( pls/wheel_rev )
-                                  ^
-                              Constant
+                                |_______________|
+                                        ^
+                                     Constant
+
+    Lower case --> UNITS
+    Upper case --> VARIABLES
+
+    PLS   = number of pulses counted
+    uSEC  = duration of time that the pulses occured in, measured in microseconds
+    mSEC  = duration of time that the pulses occured in, measured in milliseconds
+    SEC   = duration of time that the pulses occured in, measured in seconds
+    MIN   = duration of time that the pulses occured in, measured in minutes
+
 
     Encoder Pulse = pls
     pls/wheel_rev = 1008
-    PLS/SEC = (1000msec/sec)* PLS/mSEC 
-    PLS/MIN = (60sec/min) * PLS/SEC = (60000msec/min) * PLS/mSEC
-    
-    wheel_rev/min = 60000 * pls/msec
 
+    ///// IN milliseconds
+    PLS/SEC = 1000 * PLS/mSEC           :>  (1000msec/1sec) * PLS/mSEC 
+    PLS/MIN = 60 * PLS/SEC              :>  (60sec/min) * PLS/SEC
+    PLS/MIN = 60*1000 * PLS/mSEC        :>  (1000msec/1sec) * (60sec/min) * PLS/SEC = (60000msec/min)
+    PLS/MIN = 60000 * PLS/mSEC:>  (60000msec/min) * PLS/mSEC
+
+    wheel_rev/min = 60000 * PLS/mSEC * pls/wheel_rev
+    wheel_rev/min = 6*10^4 * PLS/mSEC * pls/wheel_rev
+
+    ///// IN microseconds
+    PLS/mSEC = 1000 * PLS/uSEC                      :>  (1000uSEC/1msec) * PLS/uSEC
+    PLS/SEC = 1000 * PLS/mSEC                       :>  (1000msec/1sec) * PLS/mSEC 
+    PLS/SEC = 1000 * 1000 PLS/uSEC = 10^6 PLS/uSEC         
+    PLS/MIN = 60 * PLS/SEC                          :>  (60 sec/min) * PLS/SEC
+    PLS/MIN = 60 * 10^6 PLS/uSEC        
+    PLS/MIN = 60 * 10^6 PLS/uSEC                    :>  (60*10^6 usec/min) * PLS/uSEC
+    
+    wheel_rev/min = (6*10^7 * PLS/uSEC) / (pls/wheel_rev)
+                  = (6*10^7 * PLS/uSEC) / 1008
+                  = 60000 * PLS/10000
+                  = 6 * PLS
+
+    Pulses_per_10ms = pulses * (10ms / loop_time) => speed
+    speed = pulses * (10000us / loop_time) => speed
+
+    // Old expressions
     // <---- (60000*encoder_pulse_counter/(dt_theory_ms)) /1008;
 
     // <---- 60000/3*encoder_pulse_counter_sum/(dt_actual_us);
@@ -68,20 +101,22 @@ VectorFloat gravity;    // [x, y, z]            gravity vector
 float euler[3];         // [psi, theta, phi]    Euler angle container
 float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
 
-float Kp_ang = 10;
+float Kp_ang =.1;
 float Ki_ang = 0.0;
 float Kd_ang = 0.00;
-float Kp_rpm = 0.73;
-float Ki_rpm = 0.1;
-float Kd_rpm = 0.0;
+float Kp_speed = 0.10;
+float Ki_speed = 0.47;
+float Kd_speed = 0.0;
 float angle_sp = 0.3;
-int rpm_sp = 0;
+float speed_sp = 0;
+int previous_speed_sp = 0;
+int ref_speed_sp = 0;
 float I_err_angle = 0;
 float prev_err_angle = 0;
-int I_err_rpm = 0;
-int prev_err_rpm = 0;
+int I_err_speed = 0;
+int prev_err_speed = 0;
 int max_pwm = 255;
-int max_rpm = 300;
+int max_speed = 3500;
 
 int off_thresh_L = -10;
 int off_thresh_R = 10;
@@ -90,18 +125,21 @@ float dither_ratio = 350;
 float dither_const = 0.05;
 float accum = 0;
 int counter = 0;
-int n_counts = 200;
+int n_counts = 20;
 signed long encoder_pulse_counter = 0;
 int desired_direction = 1;
 int cur_direction = 1;
-int pulses_arr[3] = {0,0,0};
 volatile bool mpuInterrupt = false;     // indicates whether MPU interrupt pin has gone high
 bool fifo_avaiable = false;
 bool check_for_fifo = true;
 
-long dt_theory_us = 10000; // 10000us = 10ms
+// int pulses_arr[3] = {0,0,0};
+int pulses_arr[1] = {0};
+float average_scope = 1;
+
+long dt_theory_us = 20000; // 10000us = 10ms
 long dt_theory_ms = dt_theory_us/1000;
-long dt_actual_us = 10000;
+long dt_actual_us = 20000;
 long dt_actual_ms = dt_actual_us/1000;
 unsigned long t_start_actual = micros();
 unsigned long t_start_loop = micros();
@@ -225,25 +263,16 @@ void loop()
     t_start_loop = micros();
     int encoder_pulse_counter_sum = 0;
     // int rpm = 0;
-    int rpm_avg = 0;
-    int rpm_error = 0;
+    // int rpm_avg = 0;
+    // int rpm_error = 0;
+    float speed = 0;
+    float speed_avg = 0;
+    int speed_error = 0;
+    int pwm_direction = 0; 
     mpu.dmpGetQuaternion(&q, fifoBuffer);
     mpu.dmpGetGravity(&gravity, &q);
     mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);    
     double cur_angle = ypr[1]*180/M_PI-.8; 
-
-    for(int i=2;i>0;i--) // add values to rolling pulses-moving-average
-    {
-      pulses_arr[i] = pulses_arr[i-1];
-      encoder_pulse_counter_sum += pulses_arr[i-1];
-    }
-    pulses_arr[0] = encoder_pulse_counter;
-    encoder_pulse_counter_sum += encoder_pulse_counter;    
-
-    
-    // rpm = 60000*encoder_pulse_counter/(dt_actual_us); // <---- (60000*encoder_pulse_counter/(dt_theory_ms)) /1008;
-    rpm_avg = ((cur_direction*20000)*encoder_pulse_counter_sum)/dt_actual_us;  // <---- cur_direction*60000/3*encoder_pulse_counter_sum/(dt_actual_us);
-    encoder_pulse_counter = 0;  
 
     ////// Print angles
     // Serial.print("ypr\t");
@@ -252,6 +281,21 @@ void loop()
     // Serial.print(ypr[1] * 180/M_PI);
     // Serial.print("\t");
     // Serial.println(ypr[2] * 180/M_PI);
+
+    for(int i=average_scope-1;i>0;i--) // add values to rolling pulses-moving-average
+    {
+      pulses_arr[i] = pulses_arr[i-1];
+      encoder_pulse_counter_sum += pulses_arr[i-1];
+    }
+    pulses_arr[0] = encoder_pulse_counter;
+    encoder_pulse_counter_sum += encoder_pulse_counter;    
+
+    float time_factor = 400000.0/dt_actual_us;  // equal to 40 if dt_actual=10000.  equal to 20 if dt_actual=20000. equal to 13 if dt_actual=30000 
+    // NOTE: speed = encoder_pulses_per_40ms (scaled by 10 to avoid rounding errors -----> 40,000 -> 400,000 )
+    // rpm = 60000*encoder_pulse_counter/(dt_actual_us);
+    // speed = encoder_pulse_counter * time_factor;             
+    speed_avg = cur_direction * encoder_pulse_counter_sum * 1.0 * time_factor / average_scope;
+    encoder_pulse_counter = 0;
     
     float error_angle = 0;
     if(!((cur_angle < off_thresh_L) || (cur_angle > off_thresh_R)))
@@ -261,61 +305,97 @@ void loop()
       error_angle = angle_sp - cur_angle - accum;
       I_err_angle += error_angle * dt_actual_ms/5;
       // Clamp integrated error
-      if(I_err_angle > max_rpm/2)
+      if(I_err_angle > max_speed/2)
       {
-        I_err_angle = max_rpm/2;
+        I_err_angle = max_speed/2;
       }
-      else if(I_err_angle < -(max_rpm/2))
+      else if(I_err_angle < -(max_speed/2))
       {
-        I_err_angle = -max_rpm/2;
+        I_err_angle = -max_speed/2;
       }
 
-      rpm_sp = error_angle*Kp_ang + I_err_angle*Ki_ang + (error_angle - prev_err_angle)/dt_actual_us*Kd_ang;
+      speed_sp = error_angle*Kp_ang + I_err_angle*Ki_ang + (error_angle - prev_err_angle)/dt_actual_us*Kd_ang;
       prev_err_angle = error_angle;
-      // Clamp RPM
-      if(rpm_sp > max_rpm)
+      // Clamp speed
+      if(speed_sp > max_speed)
       {
-        rpm_sp = max_rpm;
+        speed_sp = max_speed;
       }
-      else if(rpm_sp < -1*max_rpm)
+      else if(speed_sp < -1*max_speed)
       {
-        rpm_sp = -1*max_rpm;
+        speed_sp = -1*max_speed;
       }
       ///////////////////////////////////////////////
       ///////////////////////////////////////////////
 
       // PWM calculations (RPM PID)
       ///////////////////////////////////////////////
-      rpm_error = rpm_sp - rpm_avg;
-      I_err_rpm += (rpm_error * dt_actual_ms/5);
+      speed_error = speed_sp - speed_avg;
+      I_err_speed += (speed_error * dt_actual_ms/5);
       // Clamp integrated error
-      if(I_err_rpm > max_pwm/2)
+      if(I_err_speed > max_pwm/2)
       {
-        I_err_rpm = max_pwm/2;
+        I_err_speed = max_pwm/2;
         // Serial.print("HIGH: ");
         // Serial.println(I_err_rpm);
       }
-      else if(I_err_rpm < -(max_pwm/2))
+      else if(I_err_speed < -(max_pwm/2))
       {
-        I_err_rpm = -max_pwm/2;
+        I_err_speed = -max_pwm/2;
         // Serial.print("LOW: ");
         // Serial.println(I_err_rpm);
       }
-      pwm = rpm_error*Kp_rpm + I_err_rpm*Ki_rpm + (rpm_error - prev_err_rpm)/dt_actual_us*Kd_rpm;
-      prev_err_rpm = rpm_error;
+      pwm = speed_error*Kp_speed + I_err_speed*Ki_speed + (speed_error - prev_err_speed)/dt_actual_us*Kd_speed;
+      prev_err_speed = speed_error;
       ///////////////////////////////////////////////
 
+      //////////////////////////////////////////////////////////////////////////////////////////////
+      // Need a clause -- IF    current_speed_setpoint < previous_speed_setpoint AND they have the same sign
+      //                  THEN  pwm direction must not change, pwm remain the same sign (but can go to zero..)            
+      //////////////////////////////////////////////////////////////////////////////////////////////
       
-      if(pwm >= 0)
+      if(previous_speed_sp != speed_sp)
       {
+        ref_speed_sp = previous_speed_sp;
+      }
+      previous_speed_sp = speed_sp; 
+     
+      if((speed_sp > 0) && (ref_speed_sp > 0))
+      {        
+        if(ref_speed_sp > speed_sp)
+        {
+          if(pwm < 0)
+          {
+            pwm = 0;
+          }
+        }
+      }
+      else if((speed_sp < 0) && (ref_speed_sp < 0))
+      {
+        if(ref_speed_sp < speed_sp)
+        {
+          if(pwm > 0)
+          {
+            pwm = 0;
+          }
+        }
+      }
+      //////////////////////////////////////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////////////////////////////////////////
+
+      int corrected_pwm = pwm;
+      if(pwm > 0)
+      {
+        pwm_direction = 1;
         if(pwm > max_pwm)
         {
-          pwm = max_pwm;
+          corrected_pwm = max_pwm;
         }
         digitalWrite(en, HIGH);
-        analogWrite(out1, pwm);
+        analogWrite(out1, corrected_pwm);
         analogWrite(out2, 0);
-        // accum -= pwm_int/dither_ratio;
+
+        // accum -= corrected_pwm/dither_ratio;
         // if(accum > dither_bounce)
         // {
         //   accum = dither_bounce;
@@ -327,18 +407,20 @@ void loop()
       }
       else if(pwm < 0)
       {
+        pwm_direction = -1;
         if(pwm <= -max_pwm)
         {
-          pwm = max_pwm;
+          corrected_pwm = max_pwm;
         }
         else
         {
-          pwm = -1*pwm;
+          corrected_pwm = -1*pwm;
         }
         digitalWrite(en, HIGH);
         analogWrite(out1, 0);
-        analogWrite(out2, pwm);
-        // accum += pwm_int/dither_ratio;
+        analogWrite(out2, corrected_pwm);
+
+        // accum += corrected_pwm/dither_ratio;
         // if(accum > dither_bounce)
         // {
         //   accum = dither_bounce;
@@ -347,7 +429,13 @@ void loop()
         // {
         //   accum = -dither_bounce;
         // }
-      }      
+      } 
+      else
+      {
+        digitalWrite(en, LOW);
+        analogWrite(out1, 0);
+        analogWrite(out2, 0);
+      }
     }
     else
     {
@@ -355,6 +443,43 @@ void loop()
       analogWrite(out1, 0);
       analogWrite(out2, 0);
     }
+
+    ///////////////////////////////////////////////////
+    //      Serial plotter
+    ///////////////////////////////////////////////////
+    // Serial.print("Speed(RPM):");
+    // Serial.print(speed_avg/6.66667);
+    // Serial.print(",Speed_Setpoint(RPM):");
+    // Serial.print(speed_sp/6.66667);
+    Serial.print("Speed:");
+    Serial.print(speed_avg);
+    Serial.print(",speed_sp:");
+    Serial.print(speed_sp);
+    Serial.print(",speed_error:");
+    Serial.print(speed_error);
+    Serial.print(",ANGLE:");
+    Serial.print(cur_angle*10);
+    // Serial.print(",Angle_Setpoint:");
+    // Serial.print(angle_sp*10);
+    Serial.print(",Angle_error:");
+    Serial.print(error_angle*10);
+    Serial.print(",Kp_ang:");
+    Serial.print(Kp_ang,2);
+    // Serial.print(",Ki_ang:");
+    // Serial.print(Ki_ang,3);
+    // Serial.print(",Kd_ang:");
+    // Serial.println(Kd_ang,5);    
+    Serial.print(",PWM:");
+    Serial.println(pwm);
+    
+    // Serial.print(",Loop_speed:");
+    // Serial.print(dt_actual_ms);
+    // Serial.print(",PWM_DIRECTION:");
+    // Serial.print(pwm_direction*100);
+    // Serial.println();
+
+
+
     /// Keyboard inputs
     if(Serial.available() > 0)
     {
@@ -363,12 +488,12 @@ void loop()
       switch(s_input)
       {
         case 49: // 1
-          Kp_ang -= 1;
+          Kp_ang -= 0.1;
           Serial.print("Kp: ");
           Serial.println(Kp_ang);
           break;
         case 52: // 4
-          Kp_ang += 1;
+          Kp_ang += 0.1;
           Serial.print("Kp: ");
           Serial.println(Kp_ang);
           break;
@@ -424,32 +549,8 @@ void loop()
       // Serial.println(t_start_actual);
       dt_actual_us = (micros() - t_start_actual) / n_counts;
       dt_actual_ms = dt_actual_us/1000;
-      // Serial.print("Time to complete 1000 cycles: ");
-      // Serial.print(t_t);
-      // Serial.print(" ms\n");
-      // Serial.print("\nFrequency: ");
-      // Serial.print(freq);
-      // Serial.print(" Hz\n\n");
-      // Serial.println(" ms");
-      // Serial.println(rpm_error);
-      // Serial.println(angle);
-      // Serial.println(accum);
-      // Serial.println();
-      // Serial.println(encoder_pulse_counter);
-
-      Serial.print("Time to complete 1 cycle: ");
-      Serial.println(dt_actual_us);
-      // Serial.print("RPM:");
-      // Serial.print(rpm_avg);
-      // Serial.print(",Setpoint:");
-      // Serial.print(rpm_sp);
-      // Serial.print(",PWM:");
-      // Serial.print(pwm);
-      Serial.print(",ANGLE:");
-      Serial.print(cur_angle);
-      // Serial.print(",Angle_Setpoint:");
-      // Serial.print(angle_sp);
-      // Serial.println();
+      // Serial.print("Time to complete 1 cycle: ");
+      // Serial.println(dt_actual_us);
       counter = 0;
       t_start_actual = micros();
     }

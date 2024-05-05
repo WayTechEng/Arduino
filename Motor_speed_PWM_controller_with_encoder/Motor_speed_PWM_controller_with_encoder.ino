@@ -31,9 +31,9 @@ int I_err_rpm = 0;
 int prev_err_rpm = 0;
 int max_pwm = 255;
 
-unsigned long dt_theory_us = 20000; // 10000us = 10ms
+unsigned long dt_theory_us = 10000; // 10000us = 10ms
 unsigned long dt_theory_ms = dt_theory_us/1000;
-unsigned long dt_actual_us = 20000;
+unsigned long dt_actual_us = 10000;
 unsigned long dt_actual_ms = dt_actual_us/1000;
 int counter = 0;
 int n_counts = 20;
@@ -86,6 +86,7 @@ void loop()
     unsigned long rpm = 0;
     unsigned long rpm_avg = 0;
     int rpm_error = 0;
+    int speed_avg = 0;
 
     for(int i=2;i>0;i--) // add values to rolling pulses-moving-average
     {
@@ -97,6 +98,10 @@ void loop()
 
     // rpm = 60000*encoder_pulse_counter/(dt_actual_us); // <---- (60000*encoder_pulse_counter/(dt_theory_ms)) /1008;
     rpm_avg = 60000/3*encoder_pulse_counter_sum/(dt_actual_us);
+
+    int time_factor = 400000/dt_actual_us;  // equal to 40 if dt_actual=10000.  equal to 20 if dt_actual=20000. equal to 13 if dt_actual=30000 
+    avg_speed = encoder_pulse_counter_sum * time_factor * 10/3;   // Adding factor of 10 to avoid rounding errors
+    
 
     encoder_pulse_counter = 0;    
     
