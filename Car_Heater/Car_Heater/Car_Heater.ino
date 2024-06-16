@@ -9,10 +9,12 @@ const int pin_htr1 = 2;
 const int pin_htr2 = 3;
 const int pin_htr_man_enb = 11;
 const int pin_acc_on = 12;
+const int pin_charge_en = 13;
 const int pin_backlight= 10;
 
 int Pre_Sec;
 bool backlight_override = false;
+bool initial_charge_enable = false;
 
 int htr2_state = 1; // 0=OFF, 1=ON
 
@@ -92,24 +94,37 @@ void debug_PrintHeaterManualEnableState(bool state)
     lcd.setCursor( 0, 1 );
     if(state == true)
     {      
-      lcd.print("Man: H");
+      lcd.print("Man:H");
     }
     else
     {
-      lcd.print("Man: L");
+      lcd.print("Man:L");
     }
 }
 
 void debug_PrintAccessoriesState(bool state)
 {
-    lcd.setCursor( 8, 1 );
+    lcd.setCursor( 6, 1 );
     if(state == true)
     {      
-      lcd.print("Acc: H");
+      lcd.print("Acc:H");
     }
     else
     {
-      lcd.print("Acc: L");
+      lcd.print("Acc:L");
+    }
+}
+
+void debug_PrintChargeState(bool state)
+{
+  lcd.setCursor( 12, 1 );
+    if(state == true)
+    {      
+      lcd.print("C:H");
+    }
+    else
+    {
+      lcd.print("C:L");
     }
 }
 
@@ -139,6 +154,7 @@ void setup()
   pinMode(pin_htr_man_enb, INPUT);
   pinMode(pin_acc_on, INPUT);
   pinMode(pin_backlight, OUTPUT);
+  pinMode(pin_charge_en, OUTPUT);
 
   // clock
   // Serial.begin(9600);
@@ -150,7 +166,7 @@ void setup()
   // myRTC.setSecond(init_second);
   // myRTC.setDoW(init_dow);
 }
-    
+
 void loop()
 {
   bool h12;
@@ -165,10 +181,22 @@ void loop()
   if(acc_state == HIGH)
   {
     htr2_state = 0;
+    if(!initial_charge_enable)
+    {
+      delay(500);
+      digitalWrite(pin_charge_en, HIGH);
+      initial_charge_enable = true;
+    }
+    else
+    {
+      digitalWrite(pin_charge_en, HIGH);
+    }
   }
   else
   {
     htr2_state = 1;
+    digitalWrite(pin_charge_en, LOW);
+    initial_charge_enable = false;
   }
 
   if(htr_man_state == HIGH) // force the seat heater on only
@@ -200,7 +228,8 @@ void loop()
   
   printTimeToLCD(DoW, hour, minute, second);  
   debug_PrintHeaterManualEnableState(htr_man_state);
-  debug_PrintAccessoriesState(acc_state);  
+  debug_PrintAccessoriesState(acc_state);
+  debug_PrintChargeState(digitalRead(pin_charge_en));
 
   delay(1000);
   int val = analogRead(A0);
