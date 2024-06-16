@@ -18,9 +18,9 @@ bool initial_charge_enable = false;
 
 int htr2_state = 1; // 0=OFF, 1=ON
 
-byte htr_start_hour = 6;
-byte htr_start_min = 35;
-byte htr_stop_min = 54;
+byte htr_start_hour = 5;
+byte htr_start_min = 30;
+byte htr_stop_min = 50;
 
 byte init_hour = 17;
 byte init_minute = 39;
@@ -236,6 +236,8 @@ void loop()
   if(val >= 0 && 30 > val)
   {
     // Serial.print("RIGHT\n");
+    byte new_hour = hour + 1;
+    myRTC.setHour(new_hour);
   }
   else if(val >= 30 && 150 > val)
   {
@@ -268,6 +270,8 @@ void loop()
   else if(val >= 380 && 580 > val)
   {
     // Serial.print("LEFT\n");
+    byte new_hour = hour - 1;
+    myRTC.setHour(new_hour);
   }
   else if(val >= 580 && 990 > val)
   {
